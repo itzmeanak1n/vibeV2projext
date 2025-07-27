@@ -131,22 +131,22 @@ function StudentDashboard() {
     setRiderError('');
     
     try {
-      // Get rider's basic details
+      console.log('Fetching rider details for riderId:', riderId);
       const response = await studentService.getRiderDetails(riderId);
-      console.log('Rider details response:', response);
+      const riderData = response.data;
+      console.log('Raw API response:', JSON.stringify(riderData, null, 2));
+      console.log('Raw API response:', JSON.stringify(riderData, null, 2));
       
       if (response && response.data) {
+        // If rider not found
         if (response.data.message === 'ไม่พบข้อมูลไรเดอร์') {
           setRiderError('ไม่พบข้อมูลไรเดอร์ในระบบ');
           return;
         }
         
-        // Handle both response formats: direct data object or nested in data property
-        let riderData = response.data.data || response.data;
-        console.log('Rider data:', riderData);
-        
-        // Get rating from the rider data
-        const riderRate = parseFloat(riderData.riderRate) || 0;
+        // The backend returns the rider data directly
+        const riderData = response.data;
+        console.log('Rider data from API:', riderData);
         
         // Prepare the rider data with the rating
         const processedRiderData = {
@@ -155,12 +155,49 @@ function StudentDashboard() {
           riderLastname: riderData.riderLastname || riderData.lastname || '',
           riderEmail: riderData.riderEmail || riderData.email || '',
           riderTel: riderData.riderTel || riderData.phone || riderData.tel || '',
-          riderProfilePic: riderData.riderProfilePic || riderData.profilePic || null,
-          vehicles: Array.isArray(riderData.vehicles) ? riderData.vehicles : [],
-          riderRate: riderRate
+          // Construct full URL for profile picture with fallback
+          riderProfilePic: (() => {
+            const profilePic = riderData.riderProfilePic || riderData.profilePic;
+            if (!profilePic) return null;
+            // Check if it's already a full URL
+            if (profilePic.startsWith('http')) return profilePic;
+            // Otherwise, construct the full URL
+            return `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/uploads/${profilePic}`;
+          })(),
+          riderRate: parseFloat(riderData.riderRate) || 0,
+          // Process vehicles array from the backend
+          vehicles: Array.isArray(riderData.vehicles) ? riderData.vehicles.map((v, index) => {
+            // Debug log for each vehicle
+            console.log(`Vehicle ${index}:`, JSON.stringify(v, null, 2));
+            
+            // Check all possible type fields and normalize the value
+            const modelName = (v.model || '').toLowerCase();
+            const rawType = (v.type || v.carType || '').toLowerCase().trim();
+            const isMotorcycle = 
+              rawType.includes('motor') || 
+              rawType === 'มอเตอร์ไซค์' ||
+              modelName.includes('wave') ||
+              modelName.includes('click') ||
+              modelName.includes('pcx') ||
+              modelName.includes('scoopy') ||
+              modelName.includes('fino') ||
+              modelName.includes('aerox');
+            
+            console.log(`  Raw type: '${rawType}', isMotorcycle: ${isMotorcycle}`);
+            
+            return {
+              brand: v.brand || '',
+              model: v.model || '',
+              plate: v.plate || '',
+              // Keep the original type for reference
+              type: isMotorcycle ? 'motorcycle' : 'car',
+              // Map to Thai display text
+              carType: isMotorcycle ? 'มอเตอร์ไซค์' : 'รถยนต์'
+            };
+          }) : []
         };
         
-        console.log('Processed rider data with rating:', processedRiderData);
+        console.log('Processed rider data:', processedRiderData);
         setRiderDetails(processedRiderData);
         setRiderDialogOpen(true);
       }
@@ -240,6 +277,13 @@ function StudentDashboard() {
     setRating(0);
     setRatingError('');
     setRatingDialogOpen(true);
+    try {
+      console.log('Fetching rider details for riderId:', riderId);
+      console.log('RiderId:', riderId);
+      console.log('TripId:', tripId);
+    } catch (error) {
+      console.error('Error in handleOpenRating:', error);
+    }
   }, []);
 
   // Handle notification click
@@ -513,82 +557,92 @@ function StudentDashboard() {
     );
   };
 
-  // Add a state to force re-renders for the countdown
-  const [countdownTick, setCountdownTick] = useState(0);
-
-  // Effect to update the countdown every second
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCountdownTick(prev => prev + 1);
-    }, 1000);
+  // Separate component for the countdown timer to prevent unnecessary re-renders
+  const CountdownTimer = React.memo(({ tripId, createdAt, onCancel }) => {
+    const [timeRemaining, setTimeRemaining] = React.useState(120000); // 2 minutes in ms
     
-    return () => clearInterval(interval);
-  }, []);
+    React.useEffect(() => {
+      const tripCreateTime = new Date(createdAt || new Date()).getTime();
+      const now = new Date().getTime();
+      const initialTimeRemaining = Math.max(0, 120000 - (now - tripCreateTime));
+      
+      setTimeRemaining(initialTimeRemaining);
+      
+      // Only set up the interval if there's time remaining
+      if (initialTimeRemaining > 0) {
+        const timer = setInterval(() => {
+          setTimeRemaining(prev => {
+            const newTime = prev - 1000;
+            if (newTime <= 0) {
+              clearInterval(timer);
+              onCancel();
+              return 0;
+            }
+            return newTime;
+          });
+        }, 1000);
+        
+        return () => clearInterval(timer);
+      } else {
+        onCancel();
+      }
+    }, [tripId, createdAt, onCancel]);
+    
+    const minutes = Math.floor(timeRemaining / 60000);
+    const seconds = Math.floor((timeRemaining % 60000) / 1000);
+    
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <Typography variant="caption" color="text.secondary">
+          ยกเลิกอัตโนมัติใน
+        </Typography>
+        <Typography variant="body2" color="error" fontWeight="bold">
+          {minutes}:{seconds.toString().padStart(2, '0')}
+        </Typography>
+      </Box>
+    );
+  });
 
   // Render trip action buttons based on trip status
   const renderTripAction = useCallback((trip) => {
-    // Force re-render by using the countdownTick
-    const forceUpdate = countdownTick;
-    
-    console.log('Rendering trip action for trip:', {
-      tripId: trip._id || trip.tripId,
-      status: trip.status,
-      userRate: trip.userRate,
-      completed: trip.status === 'completed',
-      cancelled: trip.status === 'cancelled',
-      createdAt: trip.createdAt
-    });
+    // Only log in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Rendering trip action for trip:', {
+        tripId: trip._id || trip.tripId,
+        status: trip.status,
+        userRate: trip.userRate,
+        completed: trip.status === 'completed',
+        cancelled: trip.status === 'cancelled',
+        createdAt: trip.createdAt
+      });
+    }
     
     // Handle pending trips with countdown (check this first)
     if (trip.status === 'pending') {
+      const tripId = trip._id || trip.tripId;
       const tripCreateTime = new Date(trip.createdAt || new Date()).getTime();
       const now = new Date().getTime();
       const timeElapsed = now - tripCreateTime;
-      const timeRemaining = Math.max(0, 120000 - timeElapsed); // 2 minutes in ms
+      const timeRemaining = Math.max(0, 120000 - timeElapsed);
       
-      // Format the remaining time
-      const minutes = Math.floor(timeRemaining / 60000);
-      const seconds = Math.floor((timeRemaining % 60000) / 1000);
-      
-      // Start the auto-cancellation timer if not already started
-      if (timeRemaining > 0) {
-        const tripId = trip._id || trip.tripId;
-        if (tripId && !tripTimers[tripId]) {
-          console.log(`Starting countdown for trip ${tripId}, time remaining: ${minutes}:${seconds.toString().padStart(2, '0')}`);
-          
-          const timerId = setTimeout(() => {
-            console.log(`Auto-cancelling trip ${tripId}`);
-            handleCancelTrip(tripId, true);
-            setTripTimers(prev => {
-              const newTimers = { ...prev };
-              delete newTimers[tripId];
-              return newTimers;
-            });
-          }, timeRemaining);
-          
-          setTripTimers(prev => ({
-            ...prev,
-            [tripId]: timerId
-          }));
-        }
-        
-        return (
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <Typography variant="caption" color="text.secondary">
-              ยกเลิกอัตโนมัติใน
-            </Typography>
-            <Typography variant="body2" color="error" fontWeight="bold">
-              {minutes}:{seconds.toString().padStart(2, '0')}
-            </Typography>
-          </Box>
-        );
-      } else {
+      // If time is up, show cancelling message
+      if (timeRemaining <= 0) {
         return (
           <Typography variant="body2" color="error" fontWeight="bold">
             กำลังยกเลิก...
           </Typography>
         );
       }
+      
+      // Otherwise, show the countdown
+      return (
+        <CountdownTimer 
+          key={`countdown-${tripId}`}
+          tripId={tripId}
+          createdAt={trip.createdAt}
+          onCancel={() => handleCancelTrip(tripId, true)}
+        />
+      );
     }
     
     // Handle completed or success trips (some systems might use 'success' instead of 'completed')
@@ -650,7 +704,7 @@ function StudentDashboard() {
         {trip.status || 'ไม่ทราบสถานะ'}
       </Typography>
     );
-  }, [tripTimers, handleCancelTrip, countdownTick]);
+  }, [handleCancelTrip]);
 
   // Debug: Log when studentTrips changes
   useEffect(() => {
@@ -1201,7 +1255,7 @@ function StudentDashboard() {
             <Box sx={{ mt: 4, mb: 4, position: 'relative' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
                 <Typography variant="h5" component="h2">
-                  Your Trips
+                  รายการเดินทางของคุณ
                 </Typography>
                 <Button
                   variant="contained"
@@ -1209,7 +1263,7 @@ function StudentDashboard() {
                   startIcon={<AddIcon />}
                   onClick={() => setOpenCreateTrip(true)}
                 >
-                  New Trip Request
+                  สร้างรายการเดินทาง
                 </Button>
               </Box>
               
@@ -1291,7 +1345,9 @@ function StudentDashboard() {
                         <TableCell>{formatDate(trip.date)}</TableCell>
                         <TableCell>{trip.pickupLocation?.name || trip.pickUpName || 'N/A'}</TableCell>
                         <TableCell>{trip.destination?.name || trip.destinationName || 'N/A'}</TableCell>
-                        <TableCell>{trip.carType === 'motorcycle' ? 'มอเตอร์ไซค์' : 'รถยนต์'}</TableCell>
+                        <TableCell>
+                          {trip.vehicle_type === 'motorcycle' ? 'มอเตอร์ไซค์' : trip.vehicle_type === 'car' ? 'รถยนต์' : trip.carType === 'motorcycle' ? 'มอเตอร์ไซค์' : 'รถยนต์'}
+                        </TableCell>
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             {renderTripStatus(trip.status, trip)}
@@ -1588,13 +1644,13 @@ function StudentDashboard() {
                       {riderDetails.vehicles.map((vehicle, index) => (
                         <Box key={index} mb={1} p={1.5} bgcolor="#f5f5f5" borderRadius={1}>
                           <Typography>
-                            <strong>ยี่ห้อ:</strong> {vehicle.brand || '-'} {vehicle.model || ''}
+                            <strong>ยี่ห้อ/รุ่น:</strong> {vehicle.brand || '-'} {vehicle.model || ''}
                           </Typography>
                           <Typography>
                             <strong>ทะเบียน:</strong> {vehicle.plate || '-'}
                           </Typography>
                           <Typography>
-                            <strong>ประเภท:</strong> {vehicle.carType === 'motorcycle' ? 'มอเตอร์ไซค์' : 'รถยนต์'}
+                            <strong>ประเภท:</strong> {vehicle.carType || 'รถยนต์'}
                           </Typography>
                         </Box>
                       ))}

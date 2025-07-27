@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "proxy": "http://192.168.1.126:5000",
-  
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
@@ -16,6 +15,7 @@
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.8.4",
     "dayjs": "^1.11.13",
+    "notistack": "^3.0.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.5.0",

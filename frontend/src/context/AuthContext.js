@@ -74,25 +74,28 @@ export const AuthProvider = ({ children }) => {
       }
 
       if (profileResponse?.data) {
-        const profileData = profileResponse.data;
+        const responseData = profileResponse.data;
+        const profileData = responseData.profile || responseData; // Handle both nested and flat structures
+        
         console.log('=== Profile Data from API ===');
         console.log('Full response:', profileResponse);
         console.log('Profile data object:', profileData);
         console.log('Profile keys:', Object.keys(profileData));
-        console.log('riderRate in profile data:', profileData.riderRate);
         
-        // Update profile
+        // Update profile with the actual profile data
         console.log('=== Setting profile state ===');
         setProfile(profileData);
         
-        // Update user
+        // Update user with the correct fields from the profile
         console.log('=== Updating user state ===');
         setUser(prevUser => {
           const updatedUser = {
             ...prevUser,
-            id: profileData.riderId || profileData.studentId || profileData.id,
+            id: profileData.id || profileData.studentId || profileData.riderId,
             userType,
-            email: profileData.riderEmail || profileData.studentEmail || profileData.email
+            email: profileData.email || profileData.userEmail || profileData.riderEmail || profileData.studentEmail,
+            firstname: profileData.firstname || profileData.userFirstname || profileData.riderFirstname,
+            lastname: profileData.lastname || profileData.userLastname || profileData.riderLastname
           };
           console.log('Updated user object:', updatedUser);
           return updatedUser;
@@ -289,30 +292,37 @@ export const AuthProvider = ({ children }) => {
       const response = await authService.login(data);
       const { token, user: loggedInUser } = response.data;
       
+      // Store the token and user type in localStorage
       localStorage.setItem('token', token);
       localStorage.setItem('userType', loggedInUser.role);
       
-      setUser({ 
-        id: loggedInUser.id, 
-        userType: loggedInUser.role, 
-        email: loggedInUser.email 
-      });
+      // Set initial user state with the data from login response
+      const userData = {
+        id: loggedInUser.id,
+        userType: loggedInUser.role,
+        email: loggedInUser.email,
+        firstname: loggedInUser.firstname,
+        lastname: loggedInUser.lastname,
+        role: loggedInUser.role
+      };
+      
+      // Store user data in localStorage
+      localStorage.setItem('user', JSON.stringify(userData));
+      
+      // Update user state
+      setUser(userData);
 
+      // Fetch the full profile data
       await fetchUserProfile(loggedInUser.role);
 
-      switch (loggedInUser.role) {
-        case 'student':
-          navigate('/dashboard/student');
-          break;
-        case 'rider':
-          navigate('/dashboard/rider');
-          break;
-        case 'admin':
-          navigate('/dashboard/admin');
-          break;
-        default:
-          navigate('/');
-      }
+      // Redirect based on user role
+      const redirectPath = {
+        'student': '/dashboard/student',
+        'rider': '/dashboard/rider',
+        'admin': '/dashboard/admin'
+      }[loggedInUser.role] || '/';
+      
+      navigate(redirectPath);
     } catch (error) {
       setError(error.response?.data?.message || 'Login failed');
       setLoading(false);

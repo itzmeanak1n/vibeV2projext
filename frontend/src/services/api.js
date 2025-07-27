@@ -240,7 +240,10 @@ export const studentService = {
   },
   getRiderDetails: async (riderId) => {
     const apiClient = createApiClient();
-    return await apiClient.get(`/api/students/rider/${riderId}`);
+    // The correct endpoint is /api/students/rider/:riderId
+    const response = await apiClient.get(`/api/students/rider/${riderId}`);
+    console.log('Rider details response:', response);
+    return response;
   },
   rateRider: async (tripId, rating) => {
     const apiClient = createApiClient();
@@ -475,6 +478,9 @@ export const adminService = {
     },
   }),
   deleteRiderVehicle: (carId) => createApiClient().delete(`/api/admin/vehicles/${carId}`),
+
+  // Reports
+  getReports: () => createApiClient().get('/api/admin/reports'),
 
   // Place management
   getPlaces: async () => {

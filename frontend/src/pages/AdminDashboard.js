@@ -1,11 +1,30 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Container,
-  Grid,
-  Paper,
-  Typography,
-  Button,
+  Alert,
+  Avatar,
   Box,
+  Button,
+  Card,
+  CardContent,
+  CardMedia,
+  CircularProgress,
+  Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControl,
+  Grid,
+  IconButton,
+  InputLabel,
+  List,
+  ListItem,
+  ListItemText,
+  MenuItem,
+  Paper,
+  Select,
+  Snackbar,
+  Tab,
   Table,
   TableBody,
   TableCell,
@@ -13,31 +32,16 @@ import {
   TableHead,
   TableRow,
   Tabs,
-  Tab,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   TextField,
-  MenuItem,
-  Avatar,
-  Divider,
-  IconButton,
   Tooltip,
-  Select,
-  InputLabel,
-  FormControl,
-  Alert,
-  CircularProgress,
+  Typography,
+  useTheme,
   Link as MuiLink,
-  Card,
-  CardMedia,
-  CardContent,
-  CardActions
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import { adminService } from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import { useSnackbar } from 'notistack';
 import EditIcon from '@mui/icons-material/Edit';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -49,7 +53,16 @@ const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy5
 
 function AdminDashboard() {
   const { user, profile, logout, auth } = useAuth();
+  const { enqueueSnackbar } = useSnackbar();
   const [tab, setTab] = useState(0);
+  const [reports, setReports] = useState({
+    totalStudents: 0,
+    totalRiders: 0,
+    activeTrips: 0,
+    completedTrips: 0,
+    recentTrips: []
+  });
+  const [isLoadingReports, setIsLoadingReports] = useState(false);
   const [students, setStudents] = useState([]);
   const [riders, setRiders] = useState([]);
   const [selectedRider, setSelectedRider] = useState(null);
@@ -137,6 +150,8 @@ function AdminDashboard() {
       fetchRiders();
     } else if (tab === 2) {
       fetchPlaces();
+    } else if (tab === 3) {
+      fetchReports();
     }
   };
 
@@ -171,6 +186,29 @@ function AdminDashboard() {
       setIsLoadingPlaces(false);
     }
   };
+
+  const fetchReports = useCallback(async () => {
+    setIsLoadingReports(true);
+    try {
+      const response = await adminService.getReports();
+      // The response data is in response.data.data because:
+      // - response.data is from axios
+      // - response.data.data is our actual API response with { success, data: { ... } }
+      const { data } = response.data;
+      setReports({
+        totalStudents: data?.totalStudents || 0,
+        totalRiders: data?.totalRiders || 0,
+        activeTrips: data?.activeTrips || 0,
+        completedTrips: data?.completedTrips || 0,
+        recentTrips: data?.recentTrips || []
+      });
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+      enqueueSnackbar('เกิดข้อผิดพลาดในการโหลดรายงาน', { variant: 'error' });
+    } finally {
+      setIsLoadingReports(false);
+    }
+  }, [enqueueSnackbar]);
 
   const handleApproveRider = async (riderId) => {
     try {
@@ -376,7 +414,6 @@ function AdminDashboard() {
               <TableCell>ชื่อ-นามสกุล</TableCell>
               <TableCell>อีเมล</TableCell>
               <TableCell>เบอร์โทร</TableCell>
-              <TableCell>คะแนน</TableCell>
               <TableCell align="right">จัดการ</TableCell>
             </TableRow>
           </TableHead>
@@ -384,12 +421,9 @@ function AdminDashboard() {
             {students.map((student) => (
               <TableRow key={student.studentId}>
                 <TableCell>{student.studentId}</TableCell>
-                <TableCell>
-                  {student.userFirstname} {student.userLastname}
-                </TableCell>
+                <TableCell>{student.userFirstname} {student.userLastname}</TableCell>
                 <TableCell>{student.userEmail}</TableCell>
                 <TableCell>{student.userTel}</TableCell>
-                <TableCell>{student.userRate || '-'}</TableCell>
                 <TableCell align="right">
                   <Tooltip title="แก้ไข">
                     <IconButton size="small" onClick={() => handleOpenStudentFormDialog(student)} sx={{ mr: 1 }}>
@@ -491,7 +525,7 @@ function AdminDashboard() {
   );
 
   const renderRidersTable = () => (
-    <TableContainer component={Paper}>
+    <TableContainer>
       <Table>
         <TableHead>
           <TableRow>
@@ -688,6 +722,89 @@ function AdminDashboard() {
     }
   };
 
+  const renderReportsSection = () => {
+    if (isLoadingReports) {
+      return (
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+          <CircularProgress />
+        </Box>
+      );
+    }
+
+    return (
+      <Box>
+        <Typography variant="h5" gutterBottom>
+          ภาพรวมระบบ
+        </Typography>
+        
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <Paper sx={{ p: 2, bgcolor: 'primary.light', color: 'white' }}>
+              <Typography variant="h6">นักศึกษาทั้งหมด</Typography>
+              <Typography variant="h4">{reports.totalStudents}</Typography>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Paper sx={{ p: 2, bgcolor: 'secondary.light', color: 'white' }}>
+              <Typography variant="h6">ไรเดอร์ทั้งหมด</Typography>
+              <Typography variant="h4">{reports.totalRiders}</Typography>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Paper sx={{ p: 2, bgcolor: 'info.light' }}>
+              <Typography variant="h6">การเดินทางที่กำลังดำเนินการ</Typography>
+              <Typography variant="h4">{reports.activeTrips}</Typography>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Paper sx={{ p: 2, bgcolor: 'success.light', color: 'white' }}>
+              <Typography variant="h6">การเดินทางที่เสร็จสมบูรณ์</Typography>
+              <Typography variant="h4">{reports.completedTrips}</Typography>
+            </Paper>
+          </Grid>
+        </Grid>
+
+        
+          <Grid item xs={12} md={4}>
+            <Paper sx={{ p: 2 }}>
+              <Typography variant="h6" gutterBottom>การเดินทางล่าสุด</Typography>
+              <List dense>
+                {reports.recentTrips?.length > 0 ? (
+                  reports.recentTrips.map((trip, index) => (
+                    <ListItem key={trip.tripId || index} divider>
+                      <ListItemText
+                        primary={`${trip.userFirstname || ''} ${trip.userLastname || ''}`}
+                        secondary={
+                          <>
+                            <Typography component="span" variant="body2" color="text.primary">
+                              {trip.pickupLocation || 'ไม่ระบุจุดรับ'}
+                            </Typography>
+                            <br />
+                            {trip.destination || 'ไม่ระบุจุดหมาย'}
+                          </>
+                        }
+                      />
+                      <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', ml: 1 }}>
+                        {trip.createdAt ? new Date(trip.createdAt).toLocaleTimeString('th-TH', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) : '--:--'}
+                      </Typography>
+                    </ListItem>
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                    ไม่พบประวัติการเดินทางล่าสุด
+                  </Typography>
+                )}
+              </List>
+            </Paper>
+          </Grid>
+        
+      </Box>
+    );
+  };
+
   const handleDeletePlace = async (placeId) => {
     if (window.confirm('คุณต้องการลบสถานที่นี้ใช่หรือไม่? การลบจะไม่สามารถกู้คืนได้')) {
       setPlacesError('');
@@ -852,6 +969,7 @@ function AdminDashboard() {
                   <Tab label="นักศึกษา" />
                   <Tab label="ไรเดอร์" />
                   <Tab label="สถานที่" />
+                  <Tab label="รายงานผล" />
                 </Tabs>
               </Paper>
             </Grid>
@@ -860,6 +978,7 @@ function AdminDashboard() {
               {tab === 0 && renderStudentsTable()}
               {tab === 1 && renderRidersTable()}
               {tab === 2 && renderPlacesTable()}
+              {tab === 3 && renderReportsSection()}
             </Grid>
           </Grid>
         </Box>
