@@ -1124,20 +1124,7 @@ function StudentDashboard() {
             </Box>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Tooltip title="การแจ้งเตือน">
-              <IconButton 
-                color="primary"
-                onClick={() => setShowNotifications(!showNotifications)}
-                sx={{ 
-                  bgcolor: 'primary.light',
-                  '&:hover': { bgcolor: 'primary.main' }
-                }}
-              >
-                <Badge badgeContent={notifications.length} color="error">
-                  <NotificationsIcon />
-                </Badge>
-              </IconButton>
-            </Tooltip>
+
             <Tooltip title="ออกจากระบบ">
               <IconButton 
                 color="error" 

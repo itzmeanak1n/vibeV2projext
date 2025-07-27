@@ -7,9 +7,7 @@ import {
   Button,
   Box,
   Alert,
-  Avatar,
 } from '@mui/material';
-import { PhotoCamera } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/api';
 
@@ -23,11 +21,8 @@ function StudentRegister() {
     userEmail: '',
     userPass: '',
     userTel: '',
-    userAddress: '',
-    userprofilePic: null,
+    userAddress: ''
   });
-  
-  const [previewImage, setPreviewImage] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
@@ -36,23 +31,6 @@ function StudentRegister() {
       ...formData,
       [e.target.name]: e.target.value,
     });
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setFormData({
-        ...formData,
-        userprofilePic: file
-      });
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewImage(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
   };
 
   const handleSubmit = async (e) => {
@@ -65,11 +43,7 @@ function StudentRegister() {
       // Append all form data to FormData
       Object.keys(formData).forEach(key => {
         if (formData[key] !== null) {
-          if (key === 'userprofilePic') {
-            formDataToSend.append('userProfilePic', formData[key]);
-          } else {
-            formDataToSend.append(key, formData[key]);
-          }
+          formDataToSend.append(key, formData[key]);
         }
       });
       
@@ -153,28 +127,7 @@ function StudentRegister() {
               margin="normal"
               required
             />
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', my: 2 }}>
-              <Avatar 
-                src={previewImage} 
-                sx={{ width: 100, height: 100, mb: 2 }}
-              />
-              <input
-                accept="image/*"
-                style={{ display: 'none' }}
-                id="profile-pic-upload"
-                type="file"
-                onChange={handleFileChange}
-              />
-              <label htmlFor="profile-pic-upload">
-                <Button 
-                  variant="outlined" 
-                  component="span"
-                  startIcon={<PhotoCamera />}
-                >
-                  อัพโหลดรูปโปรไฟล์
-                </Button>
-              </label>
-            </Box>
+
             <TextField
               fullWidth
               label="เบอร์โทรศัพท์"
