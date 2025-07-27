@@ -1,0 +1,12 @@
+{
+  "apps": [
+    {
+      "app_id": "app_af8f22cb-92da-4d85-bdf8-9da0f4355be8",
+      "org_id": "user_048da50e-2f98-4ee1-8124-bc9d96eda636",
+      "deploy_url": "https://push-n3-par-clevercloud-customers.services.clever-cloud.com/app_af8f22cb-92da-4d85-bdf8-9da0f4355be8.git",
+      "git_ssh_url": "git+ssh://git@push-n3-par-clevercloud-customers.services.clever-cloud.com/app_af8f22cb-92da-4d85-bdf8-9da0f4355be8.git",
+      "name": "vibe-backend",
+      "alias": "vibe-backend"
+    }
+  ]
+}
