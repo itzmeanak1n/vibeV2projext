@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { auth, isAdmin } = require('../middleware/auth');
 const { pool } = require('../utils/db');
-const bcrypt = require('bcrypt');
+const bcryptjs = require('bcryptjs');
 const upload = require('../middleware/upload');
 
 // Get all students
@@ -62,7 +62,7 @@ router.post('/students', auth, isAdmin, async (req, res) => {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(userPass, 10);
+    const hashedPassword = await bcryptjs.hash(userPass, 10);
 
     // Insert student data
     const [result] = await pool.query(
@@ -295,7 +295,7 @@ router.post('/riders', auth, isAdmin, async (req, res) => {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(riderPass, 10);
+    const hashedPassword = await bcryptjs.hash(riderPass, 10);
 
     // Insert rider data
     const [result] = await pool.query(
