@@ -485,10 +485,15 @@ router.get('/trips', auth, async (req, res) => {
     const studentId = req.user.id;
     
     const [trips] = await pool.query(`
-      SELECT t.*, 
+      SELECT 
+        t.*, 
         p1.placeName as pickUpName, 
         p2.placeName as destinationName,
         t.is_round_trip as is_round_trip_db,
+        rv.brand as vehicle_brand,
+        rv.model as vehicle_model,
+        rv.plate as vehicle_plate,
+        rv.carType as vehicle_type,
         CASE 
           WHEN t.is_round_trip = 1 THEN 'ไป-กลับ'
           ELSE 'เที่ยวเดียว'
@@ -496,6 +501,8 @@ router.get('/trips', auth, async (req, res) => {
       FROM trips t
       LEFT JOIN places p1 ON t.placeIdPickUp = p1.placeId
       LEFT JOIN places p2 ON t.placeIdDestination = p2.placeId
+      LEFT JOIN riders r ON t.rider_id = r.riderId
+      LEFT JOIN ridervehical rv ON r.riderId = rv.riderId
       WHERE t.studentId = ?
       ORDER BY t.date DESC
     `, [studentId]);
@@ -561,7 +568,8 @@ router.get('/rider/:riderId', auth, async (req, res) => {
           `SELECT 
             brand,
             model,
-            plate
+            plate,
+            carType as type
           FROM ridervehical 
           WHERE riderId = ?`,
           [riderId]

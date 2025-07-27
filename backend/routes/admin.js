@@ -143,6 +143,96 @@ router.delete('/students/:id', auth, isAdmin, async (req, res) => {
   }
 });
 
+// Get reports data
+router.get('/reports', auth, isAdmin, async (req, res) => {
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    
+    // Get total students (from tb_user where role = 'student')
+    const [studentRows] = await connection.query(
+      'SELECT COUNT(*) as totalStudents FROM tb_user WHERE role = "student"'
+    );
+    const totalStudents = studentRows[0]?.totalStudents || 0;
+    console.log('Total students:', totalStudents);
+
+    // Get total riders (from riders table)
+    const [riderRows] = await connection.query(
+      'SELECT COUNT(*) as totalRiders FROM riders'
+    );
+    const totalRiders = riderRows[0]?.totalRiders || 0;
+    console.log('Total riders:', totalRiders);
+
+    // Get active trips (from trips where status = 'accepted')
+    const [activeTripRows] = await connection.query(
+      'SELECT COUNT(*) as activeTrips FROM trips WHERE status = "accepted"'
+    );
+    const activeTrips = activeTripRows[0]?.activeTrips || 0;
+    console.log('Active trips:', activeTrips);
+
+    // Get completed trips (from trips where status = 'success')
+    const [completedTripRows] = await connection.query(
+      'SELECT COUNT(*) as completedTrips FROM trips WHERE status = "success"'
+    );
+    const completedTrips = completedTripRows[0]?.completedTrips || 0;
+    console.log('Completed trips:', completedTrips);
+
+    // Get recent trips (latest 5 completed trips)
+    const recentTripsQuery = `
+      SELECT 
+        t.*, 
+        u.userFirstname, 
+        u.userLastname, 
+        u.userTel,
+        r.riderFirstname, 
+        r.riderLastname, 
+        r.riderTel,
+        p1.placeName as pickupLocation,
+        p2.placeName as destination
+      FROM trips t
+      LEFT JOIN tb_user u ON t.studentId = u.studentId
+      LEFT JOIN riders r ON t.rider_id = r.riderId
+      LEFT JOIN places p1 ON t.placeIdPickUp = p1.placeId
+      LEFT JOIN places p2 ON t.placeIdDestination = p2.placeId
+      WHERE t.status = 'success'
+      ORDER BY t.date DESC
+      LIMIT 5`;
+    
+    console.log('Executing recent trips query:', recentTripsQuery);
+    const [recentTrips] = await connection.query(recentTripsQuery);
+    console.log('Recent trips result:', recentTrips);
+
+    res.json({
+      success: true,
+      data: {
+        totalStudents: parseInt(totalStudents),
+        totalRiders: parseInt(totalRiders),
+        activeTrips: parseInt(activeTrips),
+        completedTrips: parseInt(completedTrips),
+        recentTrips: recentTrips || []
+      }
+    });
+  } catch (error) {
+    console.error('Error in /reports endpoint:');
+    console.error('Error message:', error.message);
+    console.error('Error code:', error.code);
+    console.error('Error SQL:', error.sql);
+    console.error('Error stack:', error.stack);
+    
+    res.status(500).json({ 
+      success: false,
+      message: 'เกิดข้อผิดพลาดในการดึงรายงาน',
+      error: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        code: error.code,
+        sql: error.sql
+      } : undefined
+    });
+  } finally {
+    if (connection) await connection.release();
+  }
+});
+
 // Get all riders
 router.get('/riders', auth, isAdmin, async (req, res) => {
   try {
