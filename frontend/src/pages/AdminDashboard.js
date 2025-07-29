@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import PersonIcon from '@mui/icons-material/Person';
+import TwoWheelerIcon from '@mui/icons-material/TwoWheeler';
 import {
   Alert,
   Avatar,
@@ -58,8 +60,10 @@ function AdminDashboard() {
   const [reports, setReports] = useState({
     totalStudents: 0,
     totalRiders: 0,
+    totalPlaces: 0,
     activeTrips: 0,
     completedTrips: 0,
+    cancelledTrips: 0,
     recentTrips: []
   });
   const [isLoadingReports, setIsLoadingReports] = useState(false);
@@ -273,17 +277,28 @@ function AdminDashboard() {
   const fetchReports = useCallback(async () => {
     setIsLoadingReports(true);
     try {
-      const response = await adminService.getReports();
-      // The response data is in response.data.data because:
-      // - response.data is from axios
-      // - response.data.data is our actual API response with { success, data: { ... } }
-      const { data } = response.data;
+      // Fetch reports data
+      const reportsResponse = await adminService.getReports();
+      const { data: reportsData } = reportsResponse.data;
+      
+      // Fetch places count
+      let totalPlaces = 0;
+      try {
+        const placesResponse = await adminService.getPlacesCount();
+        totalPlaces = placesResponse.data?.total || 0;
+      } catch (placesError) {
+        console.error('Error fetching places count:', placesError);
+        // Continue with default value of 0 if there's an error
+      }
+      
       setReports({
-        totalStudents: data?.totalStudents || 0,
-        totalRiders: data?.totalRiders || 0,
-        activeTrips: data?.activeTrips || 0,
-        completedTrips: data?.completedTrips || 0,
-        recentTrips: data?.recentTrips || []
+        totalStudents: reportsData?.totalStudents || 0,
+        totalRiders: reportsData?.totalRiders || 0,
+        totalPlaces: totalPlaces,
+        activeTrips: reportsData?.activeTrips || 0,
+        completedTrips: reportsData?.completedTrips || 0,
+        cancelledTrips: reportsData?.cancelledTrips || 0,
+        recentTrips: reportsData?.recentTrips || []
       });
     } catch (error) {
       console.error('Error fetching reports:', error);
@@ -856,15 +871,27 @@ function AdminDashboard() {
             </Paper>
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
-            <Paper sx={{ p: 2, bgcolor: 'info.light' }}>
-              <Typography variant="h6">การเดินทางที่กำลังดำเนินการ</Typography>
-              <Typography variant="h4">{reports.activeTrips}</Typography>
+            <Paper sx={{ p: 2, bgcolor: 'info.main', color: 'white' }}>
+              <Typography variant="h6" color="inherit">จำนวนสถานที่</Typography>
+              <Typography variant="h4" color="inherit">{reports.totalPlaces || 0}</Typography>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Paper sx={{ p: 2, bgcolor: 'info.main', color: 'white' }}>
+              <Typography variant="h6" color="inherit">การเดินทางที่กำลังดำเนินการ</Typography>
+              <Typography variant="h4" color="inherit">{reports.activeTrips}</Typography>
             </Paper>
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <Paper sx={{ p: 2, bgcolor: 'success.light', color: 'white' }}>
               <Typography variant="h6">การเดินทางที่เสร็จสมบูรณ์</Typography>
               <Typography variant="h4">{reports.completedTrips}</Typography>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Paper sx={{ p: 2, bgcolor: 'error.light', color: 'white' }}>
+              <Typography variant="h6">การเดินทางที่ถูกยกเลิก</Typography>
+              <Typography variant="h4">{reports.cancelledTrips}</Typography>
             </Paper>
           </Grid>
         </Grid>
@@ -878,7 +905,22 @@ function AdminDashboard() {
                   reports.recentTrips.map((trip, index) => (
                     <ListItem key={trip.tripId || index} divider>
                       <ListItemText
-                        primary={`${trip.userFirstname || ''} ${trip.userLastname || ''}`}
+                        primary={
+                          <>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <PersonIcon fontSize="small" />
+                              <span>{`${trip.userFirstname || ''} ${trip.userLastname || ''}`}</span>
+                            </Box>
+                            {trip.riderFirstname && (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                <TwoWheelerIcon fontSize="small" color="primary" />
+                                <Typography variant="body2" color="text.secondary">
+                                  ให้บริการโดย: {`${trip.riderFirstname} ${trip.riderLastname || ''}`}
+                                </Typography>
+                              </Box>
+                            )}
+                          </>
+                        }
                         secondary={
                           <>
                             <Typography component="span" variant="body2" color="text.primary">

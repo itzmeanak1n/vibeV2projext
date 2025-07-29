@@ -487,6 +487,11 @@ export const adminService = {
     const apiClient = createApiClient();
     return await apiClient.get('/api/admin/places');
   },
+  
+  getPlacesCount: async () => {
+    const apiClient = createApiClient();
+    return await apiClient.get('/api/admin/places/count');
+  },
   addPlace: async (formData) => {
     const apiClient = createApiClient();
     return await apiClient.post('/api/admin/places', formData, {
