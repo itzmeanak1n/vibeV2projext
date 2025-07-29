@@ -5,6 +5,17 @@ const { pool } = require('../utils/db');
 const bcryptjs = require('bcryptjs');
 const upload = require('../middleware/upload');
 
+// Get total places count
+router.get('/places/count', auth, isAdmin, async (req, res) => {
+  try {
+    const [result] = await pool.query('SELECT COUNT(*) as total FROM places');
+    res.json({ total: result[0].total });
+  } catch (error) {
+    console.error('Error counting places:', error);
+    res.status(500).json({ message: 'เกิดข้อผิดพลาดในการนับจำนวนสถานที่' });
+  }
+});
+
 // Get all students
 router.get('/students', auth, isAdmin, async (req, res) => {
   try {
@@ -177,6 +188,13 @@ router.get('/reports', auth, isAdmin, async (req, res) => {
     const completedTrips = completedTripRows[0]?.completedTrips || 0;
     console.log('Completed trips:', completedTrips);
 
+    // Get cancelled trips (from trips where status = 'cancelled')
+    const [cancelledTripRows] = await connection.query(
+      'SELECT COUNT(*) as cancelledTrips FROM trips WHERE status = "cancelled"'
+    );
+    const cancelledTrips = cancelledTripRows[0]?.cancelledTrips || 0;
+    console.log('Cancelled trips:', cancelledTrips);
+
     // Get recent trips (latest 5 completed trips)
     const recentTripsQuery = `
       SELECT 
@@ -205,11 +223,12 @@ router.get('/reports', auth, isAdmin, async (req, res) => {
     res.json({
       success: true,
       data: {
-        totalStudents: parseInt(totalStudents),
-        totalRiders: parseInt(totalRiders),
-        activeTrips: parseInt(activeTrips),
-        completedTrips: parseInt(completedTrips),
-        recentTrips: recentTrips || []
+        totalStudents,
+        totalRiders,
+        activeTrips,
+        completedTrips,
+        cancelledTrips,
+        recentTrips
       }
     });
   } catch (error) {
