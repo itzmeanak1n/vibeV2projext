@@ -5,14 +5,71 @@ require('dotenv').config();
 
 const app = express();
 
-// Middleware
-app.use(cors({
-  origin: [
-    'https://vibe-v2projext.vercel.app/', // เปลี่ยนเป็น URL Vercel ของคุณ
-    'http://localhost:3000' // สำหรับทดสอบ local
+// CORS Configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // List of allowed origins
+    const allowedOrigins = [
+      // Local development
+      /^http:\/\/localhost(:[0-9]+)?$/, // Any localhost port
+      /^http:\/\/127.0.0.1(:[0-9]+)?$/, // Any 127.0.0.1 port
+      
+      // Vercel deployments
+      /^https:\/\/vibe-v2projext(-\w+)+\.vercel\.app$/,
+      'https://vibe-v2projext.vercel.app',
+      'https://vibev2projext.vercel.app',
+      
+      // Ngrok URLs (will be added dynamically when ngrok is running)
+    ];
+
+    // Check if the origin matches any allowed pattern or exact match
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (typeof allowed === 'string') {
+        return origin === allowed;
+      } else if (allowed instanceof RegExp) {
+        return allowed.test(origin);
+      }
+      return false;
+    });
+
+    // Allow ngrok URLs (any ngrok URL with https)
+    const isNgrok = /^https:\/\/[a-z0-9]+\.ngrok(\.io|\.app)$/i.test(origin) || 
+                   /^https:\/\/[a-z0-9]+\.ngrok-free\.app$/i.test(origin);
+
+    if (isAllowed || isNgrok) {
+      console.log(`✅ Allowed origin: ${origin}`);
+      return callback(null, true);
+    } else {
+      console.warn(`❌ Blocked origin: ${origin}`);
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With', 
+    'Accept',
+    'ngrok-skip-browser-warning' // For ngrok browser warning
   ],
-  credentials: true   
-}));
+  exposedHeaders: [
+    'Content-Length', 
+    'X-Foo', 
+    'X-Bar',
+    'Access-Control-Allow-Origin'
+  ],
+  maxAge: 86400, // 24 hours
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
+
+// Enable CORS with the above options
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
