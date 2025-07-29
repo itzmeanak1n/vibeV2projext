@@ -63,7 +63,16 @@ function AdminDashboard() {
     recentTrips: []
   });
   const [isLoadingReports, setIsLoadingReports] = useState(false);
-  const [students, setStudents] = useState([]);
+  const [isLoadingStudents, setIsLoadingStudents] = useState(true);
+  const [students, setStudents] = useState(() => {
+    try {
+      // If there's any initialization needed, do it here
+      return [];
+    } catch (error) {
+      console.error('Error initializing students state:', error);
+      return [];
+    }
+  });
   const [riders, setRiders] = useState([]);
   const [selectedRider, setSelectedRider] = useState(null);
   const [openRiderDialog, setOpenRiderDialog] = useState(false);
@@ -138,6 +147,80 @@ function AdminDashboard() {
     }
     return `http://localhost:5000/${normalizedPath}`;
   }, []);
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        console.log('Fetching students...');
+        setIsLoadingStudents(true);
+        
+        // Make the API call
+        const response = await adminService.getStudents();
+        
+        // Log the raw response for debugging
+        console.log('Raw API Response:', response);
+        
+        // The backend directly returns the array of students
+        if (Array.isArray(response.data)) {
+          console.log('Students data received:', response.data);
+          setStudents(response.data);
+        } else if (response.data && Array.isArray(response.data.data)) {
+          // In case the data is nested under a data property
+          console.log('Nested students data received:', response.data.data);
+          setStudents(response.data.data);
+        } else {
+          console.error('Unexpected response format:', response);
+          enqueueSnackbar('รูปแบบข้อมูลนักศึกษาไม่ถูกต้อง', { variant: 'error' });
+          setStudents([]);
+        }
+      } catch (error) {
+        console.error('Error fetching students:', error);
+        
+        // More detailed error logging
+        if (error.response) {
+          // The request was made and the server responded with a status code
+          // that falls out of the range of 2xx
+          console.error('Error response data:', error.response.data);
+          console.error('Error status:', error.response.status);
+          console.error('Error headers:', error.response.headers);
+          
+          if (error.response.status === 401) {
+            enqueueSnackbar('กรุณาลงชื่อเข้าใช้ใหม่', { variant: 'error' });
+            // Optionally redirect to login
+            // navigate('/login');
+          } else if (error.response.status === 403) {
+            enqueueSnackbar('คุณไม่มีสิทธิ์เข้าถึงข้อมูลนี้', { variant: 'error' });
+          } else {
+            enqueueSnackbar(`เกิดข้อผิดพลาด: ${error.response.data?.message || 'ไม่สามารถโหลดข้อมูลนักศึกษาได้'}`, { 
+              variant: 'error',
+              autoHideDuration: 5000
+            });
+          }
+        } else if (error.request) {
+          // The request was made but no response was received
+          console.error('No response received:', error.request);
+          enqueueSnackbar('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้', { 
+            variant: 'error',
+            autoHideDuration: 5000
+          });
+        } else {
+          // Something happened in setting up the request that triggered an Error
+          console.error('Request setup error:', error.message);
+          enqueueSnackbar(`เกิดข้อผิดพลาด: ${error.message}`, { 
+            variant: 'error',
+            autoHideDuration: 5000
+          });
+        }
+        
+        setStudents([]);
+      } finally {
+        console.log('Finished loading students');
+        setIsLoadingStudents(false);
+      }
+    };
+
+    fetchStudents();
+  }, [enqueueSnackbar]);
 
   useEffect(() => {
     fetchData();
@@ -418,26 +501,48 @@ function AdminDashboard() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {students.map((student) => (
-              <TableRow key={student.studentId}>
-                <TableCell>{student.studentId}</TableCell>
-                <TableCell>{student.userFirstname} {student.userLastname}</TableCell>
-                <TableCell>{student.userEmail}</TableCell>
-                <TableCell>{student.userTel}</TableCell>
-                <TableCell align="right">
-                  <Tooltip title="แก้ไข">
-                    <IconButton size="small" onClick={() => handleOpenStudentFormDialog(student)} sx={{ mr: 1 }}>
-                      <EditIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="ลบ">
-                    <IconButton size="small" color="error" onClick={() => handleDeleteStudent(student.studentId)}>
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
+            {!Array.isArray(students) || students.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} align="center">
+                  {isLoadingStudents ? (
+                    <CircularProgress size={24} />
+                  ) : (
+                    'ไม่มีข้อมูลนักศึกษา'
+                  )}
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              students.map((student) => (
+                <TableRow key={student.studentId}>
+                  <TableCell>{student.studentId || '-'}</TableCell>
+                  <TableCell>
+                    {student.userFirstname || ''} {student.userLastname || ''}
+                  </TableCell>
+                  <TableCell>{student.userEmail || '-'}</TableCell>
+                  <TableCell>{student.userTel || '-'}</TableCell>
+                  <TableCell align="right">
+                    <Tooltip title="แก้ไข">
+                      <IconButton 
+                        size="small" 
+                        onClick={() => handleOpenStudentFormDialog(student)} 
+                        sx={{ mr: 1 }}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="ลบ">
+                      <IconButton 
+                        size="small" 
+                        color="error" 
+                        onClick={() => handleDeleteStudent(student.studentId)}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>
